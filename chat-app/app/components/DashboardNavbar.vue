@@ -11,15 +11,15 @@ const { mode } = useResearchMode()
         <Icon name="lucide:menu" class="w-5 h-5" />
         </button>
       </div>
-      <div class="flex-1 px-2">
-        <div class="hidden rounded-full border border-base-300 bg-base-200/60 px-3 py-1.5 text-xs text-base-content/60 sm:flex sm:max-w-md sm:items-center sm:gap-2">
-          <Icon name="lucide:sparkles" class="h-4 w-4 text-primary" />
+      <div class="px-2">
+        <div class="hidden w-fit rounded-full border border-base-300 bg-base-100 px-2.5 py-1 text-[11px] font-medium text-base-content/80 shadow-sm sm:inline-flex sm:items-center sm:gap-1.5">
+          <Icon name="lucide:sparkles" class="h-3.5 w-3.5 text-primary" />
           Forge Research · {{ mode === 'deep' ? 'Deep mode' : 'Wide mode' }}
         </div>
       </div>
       <div class="flex-none gap-2">
-        <NuxtLink to="/dashboard" class="btn btn-primary btn-sm h-9 min-h-9 rounded-full px-3.5">
-          <Icon name="lucide:plus" class="h-3.5 w-3.5" />
+        <NuxtLink to="/dashboard" class="btn btn-primary btn-sm h-9 min-h-9 rounded-full px-3.5 shadow-sm font-medium">
+          <Icon name="lucide:plus" class="h-4 w-4" />
           <span class="hidden sm:inline">New Thread</span>
         </NuxtLink>
       </div>

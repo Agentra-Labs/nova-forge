@@ -88,21 +88,16 @@ const quickChats = [
       <div ref="dropzoneRef" class="relative flex flex-1 justify-center">
         <DragDropOverlay :show="isDragging" />
 
-        <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-6 px-4 py-8 sm:px-6 lg:px-10">
-          <div class="space-y-4 text-center">
-            <p class="text-sm font-medium uppercase tracking-[0.35em] text-primary/80">
-              Forge Deep Research
-            </p>
-            <h1 class="mx-auto max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl">
-              Research papers into concrete answers.
+        <div class="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-8 px-4 py-8 sm:px-6 lg:px-10">
+          <div class="text-center">
+            <h1 class="font-display flex items-center justify-center gap-3 text-3xl font-medium tracking-tight sm:text-4xl text-base-content">
+              <Icon name="lucide:sparkles" class="h-7 w-7 text-primary" />
+              Time to Forge ahead?
             </h1>
-            <p class="mx-auto max-w-3xl text-sm text-base-content/62 sm:text-base">
-              Switch between deep and wide research, gather evidence from papers, and turn synthesis into action.
-            </p>
           </div>
 
-          <div class="mx-auto w-full max-w-4xl space-y-3 rounded-[1.75rem] border border-base-300/70 bg-base-200/62 p-3 shadow-2xl shadow-neutral/10 backdrop-blur">
-            <form @submit.prevent="onSubmit" class="rounded-[1.5rem] border border-base-300/80 bg-base-100/72 p-3 transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10">
+          <div class="mx-auto w-full max-w-3xl space-y-4">
+            <form @submit.prevent="onSubmit" class="rounded-[1.75rem] border border-base-300/70 bg-base-200/50 p-3 pb-2 shadow-xl backdrop-blur-md transition-all hover:bg-base-200/70 hover:border-base-300/90 focus-within:bg-base-200/80 focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10">
               <div v-if="files.length > 0" class="mb-2 flex flex-wrap gap-2 rounded-box bg-base-200/80 p-2">
                 <FileAvatar
                   v-for="fileWithStatus in files"
@@ -119,55 +114,44 @@ const quickChats = [
 
               <textarea
                 v-model="input"
-                class="textarea textarea-ghost min-h-28 w-full resize-none bg-transparent px-1 text-base leading-7 focus:outline-none placeholder:text-base-content/40 sm:text-[1.1rem]"
-                :placeholder="mode === 'deep'
-                  ? 'Ask a focused research question and I will dig through papers for a defensible answer...'
-                  : 'Ask for a broad landscape scan and I will map the strongest directions across papers...'"
+                class="textarea textarea-ghost min-h-[5rem] w-full resize-none bg-transparent px-2 text-base leading-7 focus:outline-none placeholder:text-base-content/40 sm:text-[1.05rem]"
+                placeholder="How can I help you research today?"
                 :disabled="isUploading || loading"
               />
 
-              <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-base-300/60 pt-3">
-                <div class="flex items-center gap-2">
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div class="flex items-center gap-1 pl-1 text-base-content/70">
                   <FileUploadButton :open="open" />
-                  <ModelSelect />
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5 pr-1">
+                  <ModelSelect />
                   <ResearchModeMenu />
                   <button
                     type="submit"
-                    class="btn btn-primary btn-sm h-9 min-h-9 rounded-full px-4"
+                    class="btn btn-primary btn-circle btn-sm ml-1.5 p-0"
                     :disabled="isUploading || loading || !input.trim()"
                   >
                     <span v-if="loading || isUploading" class="loading loading-spinner loading-xs"></span>
-                    <template v-else>
-                      <span>Research</span>
-                      <Icon name="lucide:arrow-up" class="w-4 h-4" />
-                    </template>
+                    <Icon v-else name="lucide:arrow-right" class="w-4 h-4" />
                   </button>
                 </div>
               </div>
             </form>
-          </div>
-
-          <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div class="mx-auto flex max-w-[42rem] flex-wrap justify-center gap-2">
             <button
               v-for="quickChat in quickChats"
               :key="quickChat.label"
-              class="flex items-center gap-3 rounded-[1.25rem] border border-base-300/70 bg-base-100/58 px-3.5 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-base-100/82"
+              class="btn btn-outline btn-sm h-9 rounded-full border-base-300/60 text-xs font-normal text-base-content/75 hover:border-base-300 hover:bg-base-200"
               @click="createChat(quickChat.label)"
             >
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-base-200/90">
-                <Icon :name="quickChat.icon.replace('i-', '').replace('-', ':')" class="w-4 h-4" />
-              </div>
-              <div>
-                <p class="text-[13px] font-medium text-base-content">{{ quickChat.label }}</p>
-                <p class="text-xs text-base-content/55">Use as a starting point</p>
-              </div>
+              <Icon :name="quickChat.icon.replace('i-', '').replace('-', ':')" class="h-3.5 w-3.5" />
+              {{ quickChat.label }}
             </button>
           </div>
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>

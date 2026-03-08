@@ -93,12 +93,12 @@ defineShortcuts({
 
     <aside
       class="fixed inset-y-0 left-0 z-50 flex flex-col border-r border-base-300/70 bg-base-200/72 backdrop-blur-xl transition-[transform,width] duration-200 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:translate-x-0"
-      :class="[collapsed ? 'w-72 lg:w-[5.25rem]' : 'w-72', open ? 'translate-x-0' : '-translate-x-full']"
+      :class="[collapsed ? 'w-[16.5rem] lg:w-[5.25rem]' : 'w-[16.5rem]', open ? 'translate-x-0' : '-translate-x-full']"
     >
       <div class="flex items-center justify-between border-b border-base-300/80 px-5 py-4">
         <NuxtLink to="/dashboard" class="flex items-center gap-3 min-w-0" @click="open = false">
-          <div class="flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary shadow-sm">
-            <Logo class="h-5 w-auto shrink-0" />
+          <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary shadow-sm">
+            <Logo class="h-6 w-auto shrink-0" />
           </div>
           <div v-if="!collapsed" class="min-w-0">
             <p class="text-[11px] uppercase tracking-[0.3em] text-base-content/45">Workspace</p>
@@ -108,7 +108,7 @@ defineShortcuts({
 
         <div class="flex items-center gap-1">
           <button class="btn btn-ghost btn-sm btn-square hidden lg:inline-flex" @click="collapsed = !collapsed">
-            <Icon :name="collapsed ? 'lucide:panel-left-open' : 'lucide:panel-left-close'" class="h-4 w-4" />
+            <Icon :name="collapsed ? 'lucide:panel-left-open' : 'lucide:panel-left-close'" class="h-5 w-5" />
           </button>
           <button class="btn btn-ghost btn-square lg:hidden" @click="open = false">
           <Icon name="lucide:x" class="h-5 w-5" />
@@ -117,8 +117,8 @@ defineShortcuts({
       </div>
 
       <div class="flex flex-1 flex-col overflow-hidden px-3 py-4">
-        <NuxtLink to="/dashboard" class="btn btn-primary h-10 min-h-10 w-full gap-2 rounded-2xl px-3 shadow-sm" :class="collapsed ? 'justify-center px-0' : 'justify-start'" @click="open = false">
-          <Icon name="lucide:plus" class="h-3.5 w-3.5" />
+        <NuxtLink to="/dashboard" class="btn btn-primary h-10 min-h-10 w-[calc(100%-0.5rem)] mx-auto gap-2 rounded-2xl px-3 shadow text-[13px]" :class="collapsed ? 'justify-center px-0 w-full' : 'justify-start'" @click="open = false">
+          <Icon name="lucide:plus" class="h-4 w-4" />
           <span v-if="!collapsed">New thread</span>
         </NuxtLink>
 
@@ -151,12 +151,12 @@ defineShortcuts({
                     @click="open = false"
                   >
                     <div
-                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-                      :class="route.path === `/chat/${item.id}` ? 'bg-primary/12 text-primary' : 'bg-base-300/70 text-base-content/70'"
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                      :class="route.path === `/chat/${item.id}` ? 'bg-primary/12 text-primary shadow-sm' : 'bg-base-300/70 text-base-content/80 shadow-sm'"
                     >
-                      <Icon name="lucide:message-circle" class="h-3.5 w-3.5" />
+                      <Icon name="lucide:message-circle" class="h-4 w-4" />
                     </div>
-                    <span v-if="!collapsed" class="truncate text-[13px]" :class="item.label === 'Untitled' ? 'text-base-content/55' : 'text-base-content'">
+                    <span v-if="!collapsed" class="truncate text-[14px] font-medium" :class="item.label === 'Untitled' ? 'text-base-content/65' : 'text-base-content'">
                       {{ item.label }}
                     </span>
                   </NuxtLink>
@@ -179,12 +179,12 @@ defineShortcuts({
           <UserMenu v-if="loggedIn" :collapsed="collapsed" />
           <button
             v-else
-            class="btn btn-outline w-full gap-2 rounded-2xl"
-            :class="collapsed ? 'justify-center px-0' : 'justify-start'"
+            class="btn h-9 min-h-9 w-[calc(100%-0.5rem)] mx-auto gap-2 rounded-2xl border border-base-300/80 bg-base-100 shadow hover:bg-base-200"
+            :class="collapsed ? 'justify-center px-0 w-full' : 'justify-start'"
             @click="openInPopup('/auth/github')"
           >
-            <Icon name="simple-icons:github" class="h-5 w-5" />
-            <span v-if="!collapsed">Login with GitHub</span>
+            <Icon name="simple-icons:github" class="h-4 w-4" />
+            <span v-if="!collapsed" class="text-[13px] font-medium">Login with GitHub</span>
           </button>
         </div>
       </div>
