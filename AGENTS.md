@@ -1,28 +1,187 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-This repository currently ships one active application in `chat-app/`, a Nuxt 4 workspace for the Forge landing page and research UI. Frontend code lives in `chat-app/app/`:
-`pages/` for routes, `components/` for UI, `composables/` for reusable client logic, `layouts/` for shells, and `assets/css/` for styling. Server code lives in `chat-app/server/` with `api/` endpoints, `routes/` auth handlers, and `db/` schema plus migrations. Shared types and utilities live in `chat-app/shared/`. Generated output in `.nuxt/`, `.data/`, and `node_modules/` should not be edited by hand.
+This document provides guidance for AI agents working in this repository.
 
-## Build, Test, and Development Commands
-Run commands from `chat-app/`.
+## Project Overview
 
-- `pnpm install`: install dependencies; this matches the lockfile and CI workflow.
-- `pnpm dev`: start the Nuxt dev server on `http://localhost:3000`.
-- `pnpm build`: create the production build.
-- `pnpm preview`: serve the built app locally.
-- `pnpm lint`: run ESLint across the workspace.
-- `pnpm typecheck`: run Nuxt and TypeScript checks.
-- `pnpm db:generate` / `pnpm db:migrate`: update Drizzle artifacts and apply database migrations.
+This repository contains a Nuxt 4 application in `chat-app/`. It provides a research-focused chat interface with authentication, file uploads, and AI-powered research capabilities.
 
-## Coding Style & Naming Conventions
-Use 2-space indentation, LF line endings, UTF-8, and a final newline; these are enforced by `chat-app/.editorconfig`. Prefer TypeScript and Vue SFCs. Use `PascalCase` for components such as `ResearchModeSwitch.vue`, `camelCase` for composables such as `useResearchMode.ts`, and route-driven names under `app/pages/`. ESLint is configured through `chat-app/eslint.config.mjs`; keep `vue/max-attributes-per-line` compliant and avoid introducing formatter-only churn.
+## Project Structure
 
-## Testing Guidelines
-There is no committed unit-test suite yet. Treat `pnpm lint` and `pnpm typecheck` as the required pre-PR validation, then manually smoke-test the affected flow in `pnpm dev`. When adding tests later, place them near the feature or under a dedicated `tests/` directory and mirror the source name.
+```
+chat-app/
+├── app/                    # Frontend source code
+│   ├── components/         # Vue components (PascalCase)
+│   ├── composables/        # Reusable client logic (camelCase, use*.ts)
+│   ├── layouts/            # Page layouts
+│   ├── pages/              # Route pages (file-based routing)
+│   └── assets/css/         # Global styles
+├── server/                 # Server-side code
+│   ├── api/                # API endpoints
+│   ├── routes/             # Additional route handlers
+│   ├── db/                 # Database schema and migrations
+│   └── utils/              # Server utilities
+├── shared/                 # Shared types and utilities
+├── .nuxt/                  # Generated (do not edit)
+├── .data/                  # Generated (do not edit)
+└── node_modules/           # Dependencies (do not edit)
+```
 
-## Commit & Pull Request Guidelines
-Recent history mixes conventional commits (`feat(ui): ...`) with short imperative subjects (`Update root README...`). Prefer imperative, single-purpose commit messages and use an optional scope when it adds clarity. Pull requests should include a concise summary, linked issue or context, commands run locally, and screenshots or short recordings for UI changes.
+## Build, Development & Quality Commands
 
-## Security & Configuration Tips
-Copy `chat-app/.env.example` when setting up local secrets. Do not commit API keys, OAuth secrets, or database credentials. For auth and AI features, validate `NUXT_SESSION_PASSWORD`, GitHub OAuth settings, `AI_GATEWAY_API_KEY`, and storage/database variables before testing integrations.
+All commands run from `chat-app/` directory.
+
+### Core Commands
+```bash
+pnpm install      # Install dependencies (use pnpm, matches lockfile/CI)
+pnpm dev          # Start dev server at http://localhost:3000
+pnpm build        # Create production build
+pnpm preview      # Serve built app locally
+pnpm lint         # Run ESLint across workspace
+pnpm typecheck    # Run Nuxt and TypeScript checks
+```
+
+### Database Commands
+```bash
+pnpm db:generate  # Generate Drizzle ORM artifacts
+pnpm db:migrate   # Apply database migrations
+```
+
+### Running Tests
+There is no committed unit-test suite yet. Run pre-PR validation:
+```bash
+pnpm lint && pnpm typecheck
+```
+
+For manual testing, use `pnpm dev` and verify the affected flow in the browser.
+
+### Editor Setup
+The project uses ESLint with Nuxt integration. Most editors will pick up the config automatically. Ensure your editor uses:
+- 2-space indentation
+- LF line endings
+- UTF-8 charset
+
+## Code Style Guidelines
+
+### General Rules
+- Use **2-space indentation** (enforced by `.editorconfig`)
+- Use **LF line endings**, **UTF-8** charset
+- **Always include a final newline** at end of files
+- Use **TypeScript** for all new code (`.ts` files, `<script setup lang="ts">` in Vue)
+- Keep `vue/max-attributes-per-line` compliant (max 3 attributes per line)
+
+### Vue Single File Components
+```vue
+<script setup lang="ts">
+// Props with defaults using withDefaults
+withDefaults(defineProps<{
+  compact?: boolean
+}>(), {
+  compact: false
+})
+
+// Composables use camelCase
+const { mode, modes } = useResearchMode()
+</script>
+
+<template>
+  <!-- Use semantic HTML elements -->
+  <div class="...">
+    <button @click="handler">Label</button>
+  </div>
+</template>
+```
+
+### Naming Conventions
+| Type | Convention | Example |
+|------|------------|---------|
+| Components | PascalCase | `ResearchModeSwitch.vue`, `DashboardNavbar.vue` |
+| Composables | camelCase, prefix `use` | `useResearchMode.ts`, `useChat.ts` |
+| Types/Interfaces | PascalCase | `ResearchMode`, `ChatMessage` |
+| Constants | UPPER_SNAKE_CASE | `RESEARCH_MODES` |
+| Variables/Functions | camelCase | `getViewerIdentity`, `handleSubmit` |
+
+### Import Patterns
+```typescript
+// Server-side: use hub: alias
+import { db, schema } from 'hub:db'
+import { eq, desc } from 'drizzle-orm'
+
+// Composables auto-import in Vue components
+const { mode } = useResearchMode()
+
+// Icons use lucide: prefix
+<Icon name="lucide:menu" class="w-5 h-5" />
+```
+
+### Error Handling
+```typescript
+// Server API handlers - return data or throw
+export default defineEventHandler(async (event) => {
+  try {
+    const result = await doSomething()
+    return result
+  } catch (error) {
+    // Let Nuxt handle errors or return appropriate response
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to process request'
+    })
+  }
+})
+```
+
+### CSS & Styling
+- Use **Tailwind CSS** for all styling (project uses `tailwindcss` v4 and `daisyui`)
+- Prefer Tailwind utility classes over custom CSS
+- Use semantic color tokens: `bg-base-100`, `text-primary`, `border-base-300`
+- Use daisyUI components when available
+
+### TypeScript Guidelines
+- Always define types for props, composable returns, and API responses
+- Use `type` for unions, intersections, and primitives
+- Use `interface` for object shapes that may be extended
+- Avoid `any` - use `unknown` when type is truly uncertain
+
+## Security & Configuration
+
+### Environment Variables
+Copy `chat-app/.env.example` to `chat-app/.env` for local development. Required variables:
+- `NUXT_SESSION_PASSWORD` - Session encryption
+- GitHub OAuth credentials for authentication
+- `AI_GATEWAY_API_KEY` for AI features
+- Database connection variables
+
+### Security Rules
+- **Never commit** API keys, OAuth secrets, or database credentials
+- Use `.env` files (already in `.gitignore`) for local secrets
+- Validate all user inputs on both client and server
+- Use Zod for schema validation on API payloads
+
+## Git & Workflow
+
+### Commit Messages
+- Use imperative mood: "Add feature" not "Added feature"
+- Optional scope: `feat(ui):`, `fix(api):`, `refactor(db):`
+- Keep commits single-purpose and focused
+
+### Pull Requests
+- Include concise summary of changes
+- Link related issue or context
+- Document commands run locally
+- Include screenshots/recordings for UI changes
+
+### Pre-PR Checklist
+```bash
+pnpm lint      # Must pass
+pnpm typecheck # Must pass
+```
+
+## Technology Stack
+
+- **Framework**: Nuxt 4
+- **UI**: Vue 3 (Composition API), Tailwind CSS 4, daisyUI
+- **Database**: Drizzle ORM with PostgreSQL/Turso
+- **Auth**: Clerk (`@clerk/nuxt`)
+- **Icons**: Iconify (lucide, logos, simple-icons)
+- **Package Manager**: pnpm (v10.30.3)
