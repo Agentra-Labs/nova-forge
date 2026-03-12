@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const toast = useToast()
 const input = ref('')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
@@ -34,32 +35,43 @@ async function createChat(prompt: string) {
   input.value = prompt
   loading.value = true
 
-  const parts: Array<{ type: string, text?: string, mediaType?: string, url?: string }> = [{ type: 'text', text: prompt }]
+  try {
+    const parts: Array<{ type: string, text?: string, mediaType?: string, url?: string }> = [{ type: 'text', text: prompt }]
 
-  if (uploadedFiles.value.length > 0) {
-    parts.push(...uploadedFiles.value)
-  }
-
-  const chat = await $fetch('/api/chats', {
-    method: 'POST',
-    headers: { [headerName]: csrf },
-    body: {
-      id: chatId,
-      mode: mode.value,
-      message: {
-        role: 'user',
-        parts
-      }
+    if (uploadedFiles.value.length > 0) {
+      parts.push(...uploadedFiles.value)
     }
-  })
 
-  refreshNuxtData('chats')
-  navigateTo(`/chat/${chat?.id}`)
+    const chat = await $fetch('/api/chats', {
+      method: 'POST',
+      headers: { [headerName]: csrf },
+      body: {
+        id: chatId,
+        mode: mode.value,
+        message: {
+          role: 'user',
+          parts
+        }
+      }
+    })
+
+    clearFiles()
+    await refreshNuxtData('chats')
+    await navigateTo(`/chat/${chat?.id}`)
+  } catch (error) {
+    toast.add({
+      title: 'Unable to start chat',
+      description: error instanceof Error ? error.message : 'Please try again.',
+      icon: 'i-lucide-alert-circle',
+      color: 'error'
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 async function onSubmit() {
   await createChat(input.value)
-  clearFiles()
 }
 
 const quickChats = [

@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agno.db.sqlite import SqliteDb
 from agno.os import AgentOS
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from agents.chat_agent import chat_agent
@@ -129,7 +129,7 @@ async def run_ingest_job(job_id: str, request: IngestRequest):
         workflow = PaSaWorkflow(nova_client, arxiv_client, supermemory_service)
 
         # Run workflow
-        result = workflow.run(request)
+        result = await workflow.run_async(request)
 
         # Update job status
         ingest_jobs[job_id] = {
@@ -173,7 +173,7 @@ async def ingest(payload: IngestPayload, background_tasks: BackgroundTasks) -> d
 async def get_job(job_id: str) -> dict:
     """Get job status."""
     if job_id not in ingest_jobs:
-        return {"error": "Job not found"}
+        raise HTTPException(status_code=404, detail="Job not found")
     return ingest_jobs[job_id]
 
 

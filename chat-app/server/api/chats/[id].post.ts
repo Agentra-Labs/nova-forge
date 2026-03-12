@@ -2,7 +2,10 @@ import { db, schema } from 'hub:db'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { MODELS } from '#shared/utils/models'
+import { extractAgnoContent, consumeSseMessages, flushSseMessages, normalizeAgnoMessage } from '#shared/utils/agno'
+import { extractTextFromParts, sendChatRequestSchema } from '#shared/utils/chat'
 import { getViewerIdentity } from '../../utils/auth'
+import { buildChatPrompt, ensureAgnoOk, fetchAgno } from '../../utils/agno'
 
 defineRouteMeta({
     openAPI: {
@@ -19,12 +22,14 @@ export default defineEventHandler(async (event) => {
         id: z.string()
     }).parse)
 
-    const { messages } = await readValidatedBody(event, z.object({
-        model: z.string().refine(value => MODELS.some(m => m.value === value), {
-            message: 'Invalid model'
-        }),
-        mode: z.enum(['deep', 'wide']).default('deep'),
-        messages: z.array(z.any())
+    const { messages, model } = await readValidatedBody(event, sendChatRequestSchema.superRefine((body, ctx) => {
+        if (!MODELS.some(entry => entry.value === body.model)) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['model'],
+                message: 'Invalid model'
+            })
+        }
     }).parse)
 
     const chat = await db.query.chats.findFirst({
@@ -40,18 +45,22 @@ export default defineEventHandler(async (event) => {
     // Title generation via Agno
     if (!chat.title) {
         try {
+            const firstUserMessage = messages.find(message => message.role === 'user')
+            const titleSource = firstUserMessage
+                ? extractTextFromParts(firstUserMessage.parts)
+                : extractTextFromParts(messages[0]!.parts)
             const titleForm = new FormData()
-            titleForm.append('message', JSON.stringify(messages[0]))
+            titleForm.append('message', titleSource || 'New Research')
             titleForm.append('stream', 'false')
 
-            const titleResponse = await fetch(`${agnoBackendUrl}/agents/title-generator/runs`, {
+            const titleResponse = await fetchAgno(`${agnoBackendUrl}/agents/title-generator/runs`, {
                 method: 'POST',
                 body: titleForm
             })
 
             if (titleResponse.ok) {
                 const result = await titleResponse.json()
-                const title = result.content?.trim() || 'New Research'
+                const title = extractAgnoContent(result)?.trim() || 'New Research'
                 await db.update(schema.chats).set({ title }).where(eq(schema.chats.id, id as string))
             }
         } catch (error) {
@@ -60,36 +69,35 @@ export default defineEventHandler(async (event) => {
     }
 
     const lastMessage = messages[messages.length - 1]
+    if (!lastMessage || lastMessage.role !== 'user') {
+        throw createError({ statusCode: 400, statusMessage: 'Last message must be from the user' })
+    }
+
     if (lastMessage?.role === 'user') {
         await db.insert(schema.messages).values({
             chatId: id as string,
             role: 'user',
-            parts: lastMessage.parts || [{ type: 'text', text: lastMessage.content || lastMessage.text }]
+            parts: lastMessage.parts
         })
     }
 
     // Proxy request to Agno chat-agent (Agno expects multipart/form-data)
     const chatForm = new FormData()
-    chatForm.append('message', lastMessage.content || lastMessage.text || JSON.stringify(lastMessage.parts))
+    chatForm.append('message', buildChatPrompt(lastMessage.parts))
     chatForm.append('stream', 'true')
     chatForm.append('user_id', viewer.id)
     chatForm.append('session_id', id as string)
+    chatForm.append('mode', chat.mode)
+    chatForm.append('model', model)
 
-    const response = await fetch(`${agnoBackendUrl}/agents/chat-agent/runs`, {
+    const response = await fetchAgno(`${agnoBackendUrl}/agents/chat-agent/runs`, {
         method: 'POST',
         headers: {
             'Accept': 'text/event-stream'
         },
         body: chatForm
     })
-
-    if (!response.ok) {
-        const errorText = await response.text()
-        throw createError({
-            statusCode: response.status,
-            statusMessage: `Agno backend error: ${errorText}`
-        })
-    }
+    await ensureAgnoOk(response, 'Agno chat backend error')
 
     // Forward the SSE stream
     setResponseHeader(event, 'Content-Type', 'text/event-stream')
@@ -104,7 +112,9 @@ export default defineEventHandler(async (event) => {
     return sendStream(event, new ReadableStream({
         async start(controller) {
             const decoder = new TextDecoder()
+            const encoder = new TextEncoder()
             let fullContent = ''
+            let buffer = ''
 
             try {
                 while (true) {
@@ -113,18 +123,21 @@ export default defineEventHandler(async (event) => {
 
                     const chunk = decoder.decode(value, { stream: true })
                     controller.enqueue(value)
+                    const parsed = consumeSseMessages(buffer, chunk)
+                    buffer = parsed.buffer
 
-                    // Collect content to save to DB at the end
-                    const lines = chunk.split('\n')
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const data = JSON.parse(line.slice(6))
-                                if (data.content) fullContent += data.content
-                            } catch {
-                                // Ignore non-JSON or partial chunks
-                            }
+                    for (const message of parsed.messages) {
+                        const normalized = normalizeAgnoMessage(message)
+                        if (normalized.content) {
+                            fullContent += normalized.content
                         }
+                    }
+                }
+
+                for (const message of flushSseMessages(buffer)) {
+                    const normalized = normalizeAgnoMessage(message)
+                    if (normalized.content) {
+                        fullContent += normalized.content
                     }
                 }
 
@@ -138,6 +151,7 @@ export default defineEventHandler(async (event) => {
                 }
             } catch (err) {
                 console.error('Streaming error:', err)
+                controller.enqueue(encoder.encode(`event: RunError\ndata: ${JSON.stringify({ message: 'Chat stream interrupted' })}\n\n`))
             } finally {
                 controller.close()
             }

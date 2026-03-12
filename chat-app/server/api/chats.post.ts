@@ -1,17 +1,18 @@
 import { db, schema } from 'hub:db'
-import { z } from 'zod'
+import { createChatRequestSchema } from '#shared/utils/chat'
 import { getViewerIdentity } from '../utils/auth'
 
 export default defineEventHandler(async (event) => {
   const viewer = await getViewerIdentity(event)
-  const { id, message } = await readValidatedBody(event, z.object({
-    id: z.string(),
-    message: z.any()
-  }).parse)
+  const { id, mode, message } = await readValidatedBody(event, createChatRequestSchema.parse)
+  if (message.role !== 'user') {
+    throw createError({ statusCode: 400, statusMessage: 'Initial chat message must be from the user' })
+  }
 
   const [chat] = await db.insert(schema.chats).values({
     id,
     title: '',
+    mode,
     userId: viewer.id
   }).returning()
 

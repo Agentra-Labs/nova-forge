@@ -1,4 +1,4 @@
-export type ResearchMode = 'deep' | 'wide' | 'chained'
+import type { ChatMode } from '#shared/types/research'
 
 const RESEARCH_MODES = [
     {
@@ -16,7 +16,7 @@ const RESEARCH_MODES = [
 ] as const
 
 export function useResearchMode() {
-    const mode = useCookie<ResearchMode>('research-mode', {
+    const mode = useCookie<ChatMode>('research-mode', {
         default: () => 'deep'
     })
 

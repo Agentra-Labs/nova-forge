@@ -1,34 +1,34 @@
-import { defineEventHandler, readBody } from 'h3'
+import { z } from 'zod'
+import { ensureAgnoOk, fetchAgno } from '../utils/agno'
 
 export default defineEventHandler(async (event) => {
-  // Read request body
-  const body = await readBody(event)
-
-  // Get agent URL from environment variables
-  const agentUrl = process.env.AGENT_URL || 'http://localhost:7777'
+  const { agnoBackendUrl } = useRuntimeConfig()
+  const body = await readValidatedBody(event, z.object({
+    query: z.string().min(1),
+    container_tag: z.string().min(1),
+    max_candidates: z.number().int().positive().max(25).optional(),
+    citation_expansion: z.boolean().optional()
+  }).parse)
 
   try {
-    // Forward request to research agent
-    const response = await fetch(`${agentUrl}/ingest`, {
+    const response = await fetchAgno(`${agnoBackendUrl}/ingest`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
     })
-
-    // Check if response is successful
-    if (!response.ok) {
-      throw new Error(`Agent API error: ${response.status}`)
-    }
-
-    // Return the response data
-    const data = await response.json()
-    return data
+    await ensureAgnoOk(response, 'Agno ingest backend error')
+    return await response.json()
   } catch (error) {
     console.error('Error starting ingestion:', error)
-    return {
-      error: 'Failed to start ingestion process'
+    if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+      throw error
     }
+
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Failed to start ingestion process'
+    })
   }
 })

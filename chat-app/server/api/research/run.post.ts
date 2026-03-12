@@ -5,7 +5,9 @@
  * streams SSE events back to the Vue client.
  */
 import { z } from 'zod'
+import { RESEARCH_WORKFLOW_IDS } from '#shared/utils/chat'
 import { getViewerIdentity } from '../../utils/auth'
+import { buildResearchPrompt, ensureAgnoOk, fetchAgno } from '../../utils/agno'
 
 defineRouteMeta({
     openAPI: {
@@ -26,7 +28,7 @@ export default defineEventHandler(async (event) => {
         secondary_url: z.string().optional(),
         seed_arxiv_id: z.string().optional(),
         keywords: z.array(z.string()).optional(),
-        workflow: z.string().optional()
+        workflow: z.enum(RESEARCH_WORKFLOW_IDS).optional()
     }).parse)
 
     // Determine which agno endpoint to hit
@@ -46,6 +48,11 @@ export default defineEventHandler(async (event) => {
     } else if (body.mode === 'deep') {
         endpoint = `${agnoBackendUrl}/agents/deep-researcher/runs`
         payload.message = buildResearchPrompt(body)
+    } else {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'Unsupported research mode'
+        })
     }
 
     // Add user context
@@ -54,7 +61,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Agno expects multipart/form-data for agents, but x-www-form-urlencoded for workflows
-    const isWorkflow = body.workflow !== undefined;
+    const isWorkflow = body.workflow !== undefined
     const form = isWorkflow ? new URLSearchParams() : new FormData()
 
     for (const [key, value] of Object.entries(payload)) {
@@ -64,21 +71,14 @@ export default defineEventHandler(async (event) => {
     }
 
     // Proxy SSE stream from agno backend to the Vue client
-    const response = await fetch(endpoint, {
+    const response = await fetchAgno(endpoint, {
         method: 'POST',
         headers: {
             'Accept': 'text/event-stream'
         },
         body: form
     })
-
-    if (!response.ok) {
-        const errorText = await response.text()
-        throw createError({
-            statusCode: response.status,
-            statusMessage: `Agno backend error: ${errorText}`
-        })
-    }
+    await ensureAgnoOk(response, 'Agno research backend error')
 
     // Forward the SSE stream directly
     setResponseHeader(event, 'Content-Type', 'text/event-stream')
@@ -91,31 +91,3 @@ export default defineEventHandler(async (event) => {
 
     return ''
 })
-
-/**
- * Build a rich research prompt from the request body.
- */
-function buildResearchPrompt(body: {
-    goal: string
-    primary_url?: string
-    secondary_url?: string
-    seed_arxiv_id?: string
-    keywords?: string[]
-}): string {
-    const parts = [`Research Goal: ${body.goal}`]
-
-    if (body.primary_url) {
-        parts.push(`Primary Source URL: ${body.primary_url}`)
-    }
-    if (body.secondary_url) {
-        parts.push(`Secondary Source URL: ${body.secondary_url}`)
-    }
-    if (body.seed_arxiv_id) {
-        parts.push(`Seed ArXiv Paper: ${body.seed_arxiv_id}`)
-    }
-    if (body.keywords?.length) {
-        parts.push(`Keywords: ${body.keywords.join(', ')}`)
-    }
-
-    return parts.join('\n')
-}

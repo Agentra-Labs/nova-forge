@@ -3,6 +3,7 @@
  *
  * Lists available research agents and workflows from the agno backend.
  */
+import { fetchAgno } from '../../utils/agno'
 
 defineRouteMeta({
     openAPI: {
@@ -15,14 +16,23 @@ export default defineEventHandler(async () => {
     const { agnoBackendUrl } = useRuntimeConfig()
 
     try {
-        const [agentsRes, workflowsRes] = await Promise.all([
-            fetch(`${agnoBackendUrl}/agents`).then(r => r.json()).catch(() => []),
-            fetch(`${agnoBackendUrl}/workflows`).then(r => r.json()).catch(() => [])
+        const [agentsResponse, workflowsResponse] = await Promise.all([
+            fetchAgno(`${agnoBackendUrl}/agents`),
+            fetchAgno(`${agnoBackendUrl}/workflows`)
+        ])
+
+        if (!agentsResponse.ok || !workflowsResponse.ok) {
+            throw new Error('Agno listing endpoint unavailable')
+        }
+
+        const [agents, workflows] = await Promise.all([
+            agentsResponse.json(),
+            workflowsResponse.json()
         ])
 
         return {
-            agents: agentsRes,
-            workflows: workflowsRes,
+            agents,
+            workflows,
             status: 'connected'
         }
     } catch {

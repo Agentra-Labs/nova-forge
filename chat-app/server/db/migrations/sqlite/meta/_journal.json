@@ -8,6 +8,13 @@
       "when": 1762072892319,
       "tag": "0000_amusing_ozymandias",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773273600000,
+      "tag": "0001_chat_mode",
+      "breakpoints": true
     }
   ]
 }

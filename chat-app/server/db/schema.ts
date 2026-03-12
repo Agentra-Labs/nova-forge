@@ -25,6 +25,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const chats = sqliteTable('chats', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   title: text('title'),
+  mode: text('mode', { enum: ['deep', 'wide'] }).notNull().default('deep'),
   userId: text('user_id').notNull(),
   ...timestamps
 }, table => [

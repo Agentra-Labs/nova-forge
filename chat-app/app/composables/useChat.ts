@@ -1,126 +1,170 @@
-import type { ChatMessage, MessagePart } from '#shared/types/research'
+import type { ChatMessage, ChatMode, MessagePart } from '#shared/types/research'
+import { consumeSseMessages, flushSseMessages, normalizeAgnoMessage } from '#shared/utils/agno'
+import { extractFileParts, extractTextFromParts } from '#shared/utils/chat'
 
-export function useChat(chatId: string, initialMessages: any[] = []) {
-    const messages = ref<ChatMessage[]>(initialMessages)
-    const isStreaming = ref(false)
-    const error = ref<string | null>(null)
-    const abortController = ref<AbortController | null>(null)
+function buildUserMessage(text: string, files: MessagePart[] = []): ChatMessage {
+  const parts = [{ type: 'text', text } as const, ...files]
 
-    async function sendMessage(text: string, files: any[] = []) {
-        const userMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: 'user',
-            content: text,
-            parts: [{ type: 'text', text }],
-            createdAt: new Date()
+  return {
+    id: crypto.randomUUID(),
+    role: 'user',
+    content: text,
+    parts,
+    createdAt: new Date()
+  }
+}
+
+function buildAssistantMessage(): ChatMessage {
+  return {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: '',
+    parts: [{ type: 'text', text: '' }],
+    createdAt: new Date()
+  }
+}
+
+interface SendMessageOptions {
+  mode?: ChatMode
+}
+
+export function useChat(chatId: string, initialMessages: ChatMessage[] = []) {
+  const messages = ref<ChatMessage[]>(initialMessages)
+  const isStreaming = ref(false)
+  const error = ref<string | null>(null)
+  const abortController = ref<AbortController | null>(null)
+
+  async function sendMessage(text: string, files: MessagePart[] = [], options: SendMessageOptions = {}) {
+    if (isStreaming.value) {
+      stop()
+    }
+
+    const userMessage = buildUserMessage(text, files)
+    const assistantMessage = buildAssistantMessage()
+
+    messages.value.push(userMessage)
+    messages.value.push(assistantMessage)
+
+    isStreaming.value = true
+    error.value = null
+    abortController.value = new AbortController()
+
+    try {
+      const { csrf, headerName } = useCsrf()
+      const { model } = useModels()
+
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          [headerName]: csrf,
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({
+          messages: messages.value.slice(0, -1),
+          model: model.value,
+          mode: options.mode || 'deep'
+        }),
+        signal: abortController.value.signal
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response stream available')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          break
         }
-        messages.value.push(userMessage)
 
-        isStreaming.value = true
-        error.value = null
-        abortController.value = new AbortController()
+        const parsed = consumeSseMessages(buffer, decoder.decode(value, { stream: true }))
+        buffer = parsed.buffer
 
-        const assistantMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            parts: [{ type: 'text', text: '' }],
-            createdAt: new Date()
-        }
-        messages.value.push(assistantMessage)
+        for (const message of parsed.messages) {
+          const normalized = normalizeAgnoMessage(message)
+          if (normalized.error) {
+            throw new Error(normalized.error)
+          }
 
-        try {
-            const { csrf, headerName } = useCsrf()
-            const { model } = useModels()
-            const { mode } = useResearchMode()
-
-            const response = await fetch(`/api/chats/${chatId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    [headerName]: csrf,
-                    'Accept': 'text/event-stream'
-                },
-                body: JSON.stringify({
-                    messages: messages.value.slice(0, -1), // Send all but the empty assistant message
-                    model: model.value,
-                    mode: mode.value
-                }),
-                signal: abortController.value.signal
-            })
-
-            if (!response.ok) {
-                const errText = await response.text()
-                throw new Error(errText)
+          if (normalized.content) {
+            assistantMessage.content = `${assistantMessage.content || ''}${normalized.content}`
+            const firstPart = assistantMessage.parts[0]
+            if (firstPart?.type === 'text') {
+              firstPart.text = assistantMessage.content
             }
-
-            const reader = response.body?.getReader()
-            if (!reader) throw new Error('No reader')
-            console.log('Reader created, starting to read stream...')
-
-            const decoder = new TextDecoder()
-            let buffer = ''
-            let chunksReceived = 0
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                chunksReceived++
-                const decoded = decoder.decode(value, { stream: true })
-                buffer += decoded
-                console.log('Chunk', chunksReceived, ':', decoded.substring(0, 100))
-                const lines = buffer.split('\n')
-                buffer = lines.pop() || ''
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6))
-                            console.log('Parsed data:', data)
-                            if (data.content) {
-                                assistantMessage.content += data.content
-                                assistantMessage.parts[0].text = assistantMessage.content
-                            }
-                        } catch {
-                            // Ignore partial JSON
-                        }
-                    }
-                }
-            }
-            console.log('Stream complete. Chunks:', chunksReceived, 'Content length:', assistantMessage.content.length)
-        } catch (err: any) {
-            console.error('Chat error:', err)
-            if (err.name !== 'AbortError') {
-                error.value = err.message
-                messages.value.pop() // Remove failed assistant message
-            }
-        } finally {
-            isStreaming.value = false
+          }
         }
-    }
+      }
 
-    function stop() {
-        abortController.value?.abort()
-        isStreaming.value = false
-    }
-
-    function regenerate() {
-        const lastUserMessage = [...messages.value].reverse().find(m => m.role === 'user')
-        if (lastUserMessage) {
-            // Remove messages after last user message
-            const index = messages.value.lastIndexOf(lastUserMessage)
-            messages.value = messages.value.slice(0, index + 1)
-            sendMessage(lastUserMessage.content || lastUserMessage.parts?.[0]?.text || '')
+      for (const message of flushSseMessages(buffer)) {
+        const normalized = normalizeAgnoMessage(message)
+        if (normalized.error) {
+          throw new Error(normalized.error)
         }
+
+        if (normalized.content) {
+          assistantMessage.content = `${assistantMessage.content || ''}${normalized.content}`
+          const firstPart = assistantMessage.parts[0]
+          if (firstPart?.type === 'text') {
+            firstPart.text = assistantMessage.content
+          }
+        }
+      }
+
+      await refreshNuxtData('chats')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Chat request failed'
+
+      if ((err as Error)?.name !== 'AbortError') {
+        error.value = errorMessage
+      }
+
+      if (!assistantMessage.content) {
+        messages.value = messages.value.filter(message => message.id !== assistantMessage.id)
+      }
+
+      throw err
+    } finally {
+      isStreaming.value = false
+      abortController.value = null
+    }
+  }
+
+  function stop() {
+    abortController.value?.abort()
+    abortController.value = null
+    isStreaming.value = false
+  }
+
+  async function regenerate(options: SendMessageOptions = {}) {
+    const lastUserMessage = [...messages.value].reverse().find(message => message.role === 'user')
+    if (!lastUserMessage) {
+      return
     }
 
-    return {
-        messages,
-        isStreaming,
-        error,
-        sendMessage,
-        stop,
-        regenerate
-    }
+    const index = messages.value.lastIndexOf(lastUserMessage)
+    messages.value = messages.value.slice(0, index)
+
+    const text = extractTextFromParts(lastUserMessage.parts)
+    const files = extractFileParts(lastUserMessage.parts)
+    await sendMessage(text, files, options)
+  }
+
+  return {
+    messages,
+    isStreaming,
+    error,
+    sendMessage,
+    stop,
+    regenerate
+  }
 }

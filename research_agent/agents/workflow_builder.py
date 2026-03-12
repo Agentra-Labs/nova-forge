@@ -90,7 +90,7 @@ def spawn_literature_review(topic: str) -> str:
     Returns:
         Confirmation that the literature review workflow has been queued.
     """
-    return f"[SPAWN:lit-review] {topic}"
+    return f"[SPAWN:literature-review] {topic}"
 
 
 @tool()
@@ -107,7 +107,7 @@ def spawn_chained_research(goal: str, seed_paper: str = "") -> str:
     prompt = goal
     if seed_paper:
         prompt += f"\n\nSeed paper: {seed_paper}"
-    return f"[SPAWN:chained] {prompt}"
+    return f"[SPAWN:chained-research] {prompt}"
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ async def execute_builder_plan(
                 if hasattr(chunk, "content") and chunk.content:
                     yield chunk.content
 
-        elif action in ("lit-review", "chained"):
+        elif action in ("literature-review", "chained-research"):
             # These require the full workflows — yield a handoff note
             yield (
                 f"Running the **{action}** workflow — this will proceed through "

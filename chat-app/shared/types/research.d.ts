@@ -3,7 +3,8 @@
  * Single source of truth for the contract between frontend and backend.
  */
 
-export type ResearchMode = 'deep' | 'wide'
+export type ChatMode = 'deep' | 'wide'
+export type ResearchMode = ChatMode | 'builder'
 
 export interface ResearchQuery {
     goal: string

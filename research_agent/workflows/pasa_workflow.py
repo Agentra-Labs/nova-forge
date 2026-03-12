@@ -46,7 +46,16 @@ class PaSaWorkflow:
 
     def run(self, request: IngestRequest) -> IngestResult:
         """Run the PaSa workflow synchronously."""
-        return asyncio.run(self._run_async(request))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self._run_async(request))
+
+        raise RuntimeError("PaSaWorkflow.run() cannot be used inside an active event loop. Use run_async() instead.")
+
+    async def run_async(self, request: IngestRequest) -> IngestResult:
+        """Run the PaSa workflow inside an existing event loop."""
+        return await self._run_async(request)
 
     async def _run_async(self, request: IngestRequest) -> IngestResult:
         """

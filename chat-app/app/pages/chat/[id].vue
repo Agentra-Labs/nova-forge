@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DefineComponent } from 'vue'
 import type { ChatMessage } from '#shared/types/research'
+import { extractTextFromParts } from '#shared/utils/chat'
 import { useClipboard } from '@vueuse/core'
 import { useToast } from '~/composables/useToast'
 import ProseStreamPre from '../../components/prose/PreStream.vue'
@@ -12,20 +13,7 @@ const components = {
 const route = useRoute()
 const toast = useToast()
 const clipboard = useClipboard()
-const { model } = useModels()
 const { mode } = useResearchMode()
-
-// Agno research backend integration
-const research = useResearch({
-  onError: (err) => {
-    toast.add({
-      description: `Research error: ${err}`,
-      icon: 'i-lucide-alert-circle',
-      color: 'error',
-      duration: 5000
-    })
-  }
-})
 
 function getFileName(url: string): string {
   try {
@@ -57,36 +45,58 @@ if (!data.value) {
 }
 
 const chatTitle = computed(() => data.value?.title || 'Untitled chat')
+const chatMode = computed(() => data.value?.mode || mode.value)
 
 const input = ref('')
 
-const chat = useChat(data.value.id, data.value.messages)
+const thread = useThreadController({
+  chatId: data.value.id,
+  initialMessages: data.value.messages,
+  mode: chatMode,
+  onError: (message) => {
+    toast.add({
+      title: 'Thread error',
+      description: message,
+      icon: 'i-lucide-alert-circle',
+      color: 'error'
+    })
+  }
+})
 
-const isStreaming = computed(() => chat.isStreaming.value)
+const chatMessages = thread.messages
+const isStreaming = thread.isStreaming
+const isBusy = computed(() => thread.isBusy.value || isUploading.value)
+const lastChatMessage = thread.lastMessage
 
 async function handleSubmit(e: Event) {
   e.preventDefault()
-  if (input.value.trim() && !isUploading.value) {
-    const query = input.value
+  if (!input.value.trim() || isBusy.value) {
+    return
+  }
 
-    // Send to the chat stream (now using Agno backend)
-    chat.sendMessage(query, uploadedFiles.value.length > 0 ? uploadedFiles.value : undefined)
+  const started = await thread.submit({
+    text: input.value,
+    files: uploadedFiles.value.length > 0 ? uploadedFiles.value : []
+  })
 
-    // Also trigger the Agno research backend in parallel
-    research.run({
-      goal: query,
-      mode: mode.value === 'deep' ? 'deep' : 'wide',
-    })
-
+  if (started) {
     input.value = ''
     clearFiles()
   }
 }
 
+async function retryLastTurn() {
+  await thread.retry()
+}
+
+function stopAll() {
+  thread.stop()
+}
+
 const copied = ref(false)
 
-function copy(e: MouseEvent, message: ChatMessage) {
-  const text = message.parts?.[0]?.text || message.content || ''
+function copy(message: ChatMessage) {
+  const text = extractTextFromParts(message.parts) || message.content || ''
   clipboard.copy(text)
 
   copied.value = true
@@ -117,7 +127,7 @@ function copy(e: MouseEvent, message: ChatMessage) {
                   {{ chatTitle }}
                 </h1>
                 <p class="mt-1 text-xs text-base-content/60 sm:text-sm">
-                  {{ mode === 'deep'
+                  {{ chatMode === 'deep'
                     ? 'Deep mode follows evidence chains through papers, methods, and tradeoffs.'
                     : 'Wide mode surveys the landscape quickly across papers, approaches, and competing signals.' }}
                 </p>
@@ -129,7 +139,7 @@ function copy(e: MouseEvent, message: ChatMessage) {
           <div class="min-h-0 flex-1 overflow-y-auto pt-5 scroll-smooth">
             <div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
                 <div
-                  v-for="message in chat.messages"
+                  v-for="message in chatMessages"
                   :key="message.id"
                   class="flex"
                   :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
@@ -150,7 +160,7 @@ function copy(e: MouseEvent, message: ChatMessage) {
                       <div class="mb-2 flex items-center gap-2 px-1 text-xs uppercase tracking-[0.2em] text-base-content/45">
                         <span>{{ message.role === 'user' ? 'You' : 'Assistant' }}</span>
                         <span v-if="message.role === 'assistant'" class="rounded-full border border-base-300/70 px-2 py-0.5 text-[10px] tracking-[0.16em]">
-                          {{ mode === 'deep' ? 'Deep synthesis' : 'Wide scan' }}
+                          {{ chatMode === 'deep' ? 'Deep synthesis' : 'Wide scan' }}
                         </span>
                       </div>
                       <div
@@ -195,7 +205,7 @@ function copy(e: MouseEvent, message: ChatMessage) {
                       </div>
 
                       <div v-if="message.role === 'assistant' && !isStreaming" class="mt-2 flex gap-2 px-1">
-                        <button class="btn btn-ghost btn-xs gap-1 rounded-full" @click="copy($event, message)">
+                        <button class="btn btn-ghost btn-xs gap-1 rounded-full" @click="copy(message)">
                           <Icon :name="copied ? 'lucide:copy-check' : 'lucide:copy'" class="w-3 h-3" />
                           Copy
                         </button>
@@ -205,26 +215,26 @@ function copy(e: MouseEvent, message: ChatMessage) {
                 </div>
 
                 <!-- Agno Research Stream -->
-                <div v-if="research.isRunning.value || research.content.value" class="flex justify-start">
+                <div v-if="thread.researchRunning.value || thread.researchContent.value" class="flex justify-start">
                   <div class="w-full max-w-[92%] sm:max-w-[82%]">
                     <div class="mb-2 flex items-center gap-2 px-1 text-xs uppercase tracking-[0.2em] text-base-content/45">
                       <Icon name="lucide:sparkles" class="h-3 w-3 text-primary" />
                       <span>Research Agent</span>
                       <span class="rounded-full border border-primary/30 px-2 py-0.5 text-[10px] tracking-[0.16em] text-primary/70">
-                        {{ mode === 'deep' ? 'Deep analysis' : 'Wide scan' }}
+                        {{ chatMode === 'deep' ? 'Deep analysis' : 'Wide scan' }}
                       </span>
                     </div>
                     <ResearchStream
-                      :steps="research.steps.value"
-                      :current-step="research.currentStep.value"
-                      :is-running="research.isRunning.value"
-                      :content="research.content.value"
-                      :error="research.error.value"
+                      :steps="thread.researchSteps.value"
+                      :current-step="thread.researchCurrentStep.value"
+                      :is-running="thread.researchRunning.value"
+                      :content="thread.researchContent.value"
+                      :error="thread.researchError.value"
                     />
                   </div>
                 </div>
 
-                <div v-if="isStreaming && chat.messages[chat.messages.length - 1]?.role === 'user'" class="flex justify-start">
+                <div v-if="isStreaming && lastChatMessage?.role === 'user'" class="flex justify-start">
                   <div class="flex max-w-[88%] gap-3 sm:max-w-[80%]">
                     <div class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-base-300 bg-base-200">
                       <Icon name="lucide:bot" class="w-5 h-5 text-primary" />
@@ -254,8 +264,8 @@ function copy(e: MouseEvent, message: ChatMessage) {
               </div>
 
               <!-- Error display -->
-              <div v-if="chat.error" class="text-error text-sm mb-2 px-2">
-                {{ chat.error }}
+              <div v-if="thread.chatError.value" class="text-error text-sm mb-2 px-2">
+                {{ thread.chatError.value }}
               </div>
 
               <input
@@ -263,10 +273,10 @@ function copy(e: MouseEvent, message: ChatMessage) {
                 type="text"
                 class="input input-ghost w-full bg-transparent px-1 text-base focus:outline-none focus:bg-transparent placeholder:text-base-content/40"
                 @keydown.enter="handleSubmit"
-                :placeholder="mode === 'deep'
+                :placeholder="chatMode === 'deep'
                   ? 'Ask for stronger evidence, edge cases, or direct paper comparisons...'
                   : 'Ask for broader coverage, more papers, or alternate solution families...'"
-                :disabled="isUploading"
+                :disabled="isBusy"
               />
 
               <div class="mt-3 flex items-center justify-between border-t border-base-300/60 pt-3">
@@ -278,19 +288,19 @@ function copy(e: MouseEvent, message: ChatMessage) {
                 <div class="flex gap-2">
                   <ResearchModeMenu />
                   <button 
-                    v-if="isStreaming"
+                    v-if="isBusy"
                     type="button" 
                     class="btn btn-neutral btn-sm h-9 min-h-9 rounded-full px-3.5"
-                    @click="chat.stop()"
+                    @click="stopAll()"
                   >
                     <Icon name="lucide:square" class="w-4 h-4 fill-current" />
                     <span>Stop</span>
                   </button>
                   <button 
-                    v-else-if="chat.messages.length > 0 && !input"
+                    v-else-if="thread.hasMessages.value && !input"
                     type="button" 
                     class="btn btn-ghost btn-sm h-9 min-h-9 rounded-full px-3.5"
-                    @click="chat.regenerate()"
+                    @click="retryLastTurn()"
                     title="Regenerate"
                   >
                     <Icon name="lucide:rotate-cw" class="w-4 h-4" />
@@ -300,7 +310,7 @@ function copy(e: MouseEvent, message: ChatMessage) {
                     v-else
                     type="submit" 
                     class="btn btn-primary btn-sm h-9 min-h-9 rounded-full px-4"
-                    :disabled="isUploading || isStreaming || !input.trim()"
+                    :disabled="isBusy || !input.trim()"
                   >
                     <span v-if="isUploading" class="loading loading-spinner loading-xs"></span>
                     <template v-else>
