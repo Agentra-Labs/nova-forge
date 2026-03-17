@@ -27,6 +27,8 @@ from agents.paper_reader import run_paper_reader
 from agents.title_generator import run_title_generator
 from agents.wide_researcher import run_wide_researcher
 from agents.workflow_builder import execute_builder_plan, run_workflow_builder
+from agents.context_sentinel import run_context_sentinel
+from agents.evidence_auditor import run_evidence_auditor
 from errors import AgentExecutionError, AgenticaConnectionError
 from ideate.pipeline import run_pipeline
 from prompts import DEFAULT_MODEL
@@ -92,6 +94,16 @@ class IdeateRequest(BaseModel):
     model: str = DEFAULT_MODEL
 
 
+class ClarifyRequest(BaseModel):
+    prompt: str
+
+
+class AuditRequest(BaseModel):
+    claims_text: str
+    sources: list[dict[str, str]]
+    stream: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -122,6 +134,8 @@ async def root():
                 "POST /research/read",
                 "POST /research/plan",
                 "POST /research/run",
+                "POST /research/clarify",
+                "POST /research/audit",
             ],
             "ideate": [
                 "POST /ideate",
@@ -206,7 +220,6 @@ async def research_plan(req: BuilderRequest):
         if req.stream and not req.execute:
             return _sse(plan)
         if req.stream:
-            # Collect the plan text first (can't execute while streaming)
             plan_text = plan
         else:
             plan_text = plan
@@ -222,11 +235,7 @@ async def research_plan(req: BuilderRequest):
 
 @app.post("/research/run")
 async def research_run(req: WorkflowRequest):
-    """Run a multi-phase research workflow (chained or literature review).
-
-    Runs synchronously — expect 3-8 minutes for full pipeline.
-    Use background polling pattern for long-running UI.
-    """
+    """Run a multi-phase research workflow (chained or literature review)."""
     try:
         if req.workflow == "literature":
             result = await run_literature_review(req.goal)
@@ -238,10 +247,49 @@ async def research_run(req: WorkflowRequest):
 
 
 # ---------------------------------------------------------------------------
+# Context Sentinel — ambiguity detection (Issue #2)
+# ---------------------------------------------------------------------------
+
+@app.post("/research/clarify")
+async def clarify_prompt(req: ClarifyRequest):
+    """Analyze prompt for ambiguity and missing context.
+    
+    Returns confidence score, missing context, and clarification questions if needed.
+    """
+    try:
+        analysis = await run_context_sentinel(req.prompt)
+        return analysis
+    except (AgentExecutionError, AgenticaConnectionError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Evidence Auditor — claim verification (Issue #3)
+# ---------------------------------------------------------------------------
+
+@app.post("/research/audit")
+async def audit_claims(req: AuditRequest):
+    """Verify claims against source documents.
+    
+    Returns claim-by-claim verification with source mappings.
+    """
+    try:
+        result = await run_evidence_auditor(
+            req.claims_text,
+            req.sources,
+            stream=req.stream,
+        )
+        if req.stream:
+            return _sse(result)
+        return result
+    except (AgentExecutionError, AgenticaConnectionError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Ideate: async job endpoints
 # ---------------------------------------------------------------------------
 
-# In-memory job store. Replace with Redis/DB for multi-process deployments.
 _ideate_jobs: dict[str, dict] = {}
 
 
@@ -264,11 +312,7 @@ async def _run_ideate_job(job_id: str, req: IdeateRequest) -> None:
 
 @app.post("/ideate")
 async def ideate(req: IdeateRequest, background_tasks: BackgroundTasks):
-    """Start an ideation pipeline job for an arXiv paper.
-
-    Returns a job_id to poll via GET /ideate/{job_id}.
-    The pipeline takes 3-8 minutes.
-    """
+    """Start an ideation pipeline job for an arXiv paper."""
     job_id = str(uuid.uuid4())
     _ideate_jobs[job_id] = {"status": "queued", "result": None, "error": None}
     background_tasks.add_task(_run_ideate_job, job_id, req)

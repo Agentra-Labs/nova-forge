@@ -56,6 +56,7 @@ export interface ResearchSession {
     synthesis?: string
 }
 
+// Message parts - extensible union type
 export type MessagePart = 
     | { type: 'text', text: string }
     | { type: 'reasoning', text: string, state: 'running' | 'done' }
@@ -63,6 +64,28 @@ export type MessagePart =
     | { type: 'paper', paper: PaperReview }
     | { type: 'tool-weather', invocation: any }
     | { type: 'tool-chart', invocation: any }
+    // Issue #2: Clarification request from Context Sentinel
+    | { type: 'clarification',
+        confidence: number,
+        intent: string,
+        missing_context: string[],
+        questions: Array<{ id: string, question: string, options?: string[] }>,
+        best_guess_plan?: string }
+    // Issue #3: Evidence audit result
+    | { type: 'evidence',
+        claims: Array<{
+            text: string
+            sources: Array<{ excerpt: string; url: string; title?: string; confidence: 'high' | 'medium' | 'low' }>
+            overall_confidence: 'high' | 'medium' | 'low' | 'unsupported'
+            suggested_revision?: string
+        }>,
+        audit_summary: { 
+            total_claims: number
+            verified_high: number
+            verified_medium: number
+            verified_low: number
+            unsupported: number 
+        } }
 
 export interface ChatMessage {
     id: string
@@ -70,6 +93,36 @@ export interface ChatMessage {
     content?: string
     parts: MessagePart[]
     createdAt?: string | Date
+}
+
+/** Issue #2: Context analysis result from POST /research/clarify */
+export interface ContextAnalysis {
+    confidence_score: number
+    intent: string
+    scope: 'broad' | 'moderate' | 'narrow'
+    constraints: string[]
+    entities: string[]
+    missing_context: string[]
+    clarification_questions: Array<{ id: string, question: string, options?: string[] }>
+    best_guess_plan?: string
+    discovery_queries?: string[]
+}
+
+/** Issue #3: Evidence audit result from POST /research/audit */
+export interface EvidenceAudit {
+    claims: Array<{
+        text: string
+        sources: Array<{ excerpt: string; url: string; title?: string; confidence: 'high' | 'medium' | 'low' }>
+        overall_confidence: 'high' | 'medium' | 'low' | 'unsupported'
+        suggested_revision?: string
+    }>
+    audit_summary: {
+        total_claims: number
+        verified_high: number
+        verified_medium: number
+        verified_low: number
+        unsupported: number
+    }
 }
 
 /** Ideate job status from GET /ideate/{job_id} */

@@ -194,6 +194,16 @@ function copy(message: ChatMessage) {
                             class="mt-2 inline-flex"
                           />
                         </template>
+                          <ClarificationRequest
+                            v-else-if="part.type === 'clarification'"
+                            :analysis="part"
+                            class="mt-2"
+                          />
+                          <EvidenceDisplay
+                            v-else-if="part.type === 'evidence'"
+                            :audit="part"
+                            class="mt-2"
+                          />
                       </div>
 
                       <div v-if="message.role === 'assistant' && !isStreaming" class="mt-2 flex gap-2 px-1">
