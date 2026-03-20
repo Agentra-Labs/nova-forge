@@ -30,7 +30,7 @@ function extractArxivId(input: string): string {
   
   // arXiv URL
   const urlMatch = trimmed.match(/arxiv\.org\/(?:abs|pdf)\/([^/]+)/i)
-  if (urlMatch) return urlMatch[1]
+  if (urlMatch && urlMatch[1]) return urlMatch[1]
   
   return trimmed
 }
@@ -112,29 +112,29 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="rounded-[2rem] border border-base-300 bg-base-100/60 p-4 shadow-2xl shadow-neutral/5 backdrop-blur-xl">
-    <div class="flex items-center gap-3 mb-3">
+  <div class="rounded-3xl bg-base-200/60 p-4 backdrop-blur-xl transition-all focus-within:bg-base-200">
+    <div class="flex items-center gap-3 mb-4">
       <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
         <Icon name="lucide:lightbulb" class="h-5 w-5" />
       </div>
       <div>
-        <p class="text-sm font-medium">Ideate Mode</p>
-        <p class="text-xs text-base-content/55">Transform arXiv papers into product opportunities</p>
+        <p class="text-[13px] font-bold uppercase tracking-wider text-base-content/80">Ideate Mode</p>
+        <p class="text-xs text-base-content/40 italic">arXiv paper → product opportunities</p>
       </div>
     </div>
 
-    <form @submit.prevent="startIdeate" class="space-y-3">
+    <form @submit.prevent="startIdeate" class="space-y-4">
       <div class="relative">
         <input
           v-model="arxivInput"
           type="text"
-          class="input input-bordered w-full pr-20"
-          placeholder="arXiv ID (e.g., 2301.07035) or URL"
+          class="input input-ghost w-full bg-base-100/50 pr-20 text-base focus:bg-base-100 transition-colors placeholder:text-base-content/30"
+          placeholder="arXiv ID or URL..."
           :disabled="loading"
         />
         <button
           type="submit"
-          class="btn btn-primary btn-sm absolute right-1 top-1"
+          class="btn btn-neutral btn-sm absolute right-1.5 top-1.5 rounded-xl h-9 min-h-9"
           :disabled="!isValidArxivId || loading"
         >
           <span v-if="loading" class="loading loading-spinner loading-xs"></span>
@@ -142,10 +142,10 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div v-if="jobStatus" class="rounded-xl border border-base-300/70 bg-base-200/50 p-3">
+      <div v-if="jobStatus" class="rounded-2xl bg-base-100/40 p-3 border border-base-300/30">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-base-content/60">Status:</span>
-          <span class="badge badge-sm" :class="{
+          <span class="text-[11px] font-bold uppercase tracking-wider text-base-content/40">Status</span>
+          <span class="badge badge-sm uppercase text-[10px] font-bold tracking-tight" :class="{
             'badge-warning': jobStatus.status === 'queued',
             'badge-primary': jobStatus.status === 'running',
             'badge-success': jobStatus.status === 'completed',
@@ -156,20 +156,20 @@ onBeforeUnmount(() => {
         </div>
         
         <div v-if="loading" class="mt-2 flex justify-end">
-          <button type="button" class="btn btn-ghost btn-xs" @click="cancel">
-            Cancel
+          <button type="button" class="btn btn-ghost btn-xs h-7 min-h-7 text-[11px]" @click="cancel">
+            Cancel Job
           </button>
         </div>
       </div>
     </form>
 
-    <div class="mt-4 flex flex-wrap gap-1.5">
-      <span class="text-[10px] uppercase tracking-wide text-base-content/40">Examples:</span>
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      <span class="text-[10px] uppercase font-bold tracking-widest text-base-content/20">Examples</span>
       <button
         v-for="example in ['2301.07035', '2401.15884', '2312.11805']"
         :key="example"
         type="button"
-        class="rounded-full bg-base-200 px-2 py-0.5 text-xs text-base-content/60 hover:bg-base-300"
+        class="rounded-full bg-base-100/50 px-3 py-1 text-[11px] font-medium text-base-content/50 hover:bg-base-100 hover:text-base-content transition-colors"
         @click="arxivInput = example"
       >
         {{ example }}

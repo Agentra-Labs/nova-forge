@@ -21,12 +21,37 @@ export const fileMessagePartSchema = z.object({
   mediaType: z.string().min(1)
 })
 
+export const paperMessagePartSchema = z.object({
+  type: z.literal('paper'),
+  paper: z.any()
+})
 
+export const clarificationMessagePartSchema = z.object({
+  type: z.literal('clarification'),
+  confidence_score: z.number(),
+  intent: z.string(),
+  missing_context: z.array(z.string()),
+  clarification_questions: z.array(z.object({
+    id: z.string(),
+    question: z.string(),
+    options: z.array(z.string()).optional()
+  })),
+  best_guess_plan: z.string().optional()
+})
+
+export const evidenceMessagePartSchema = z.object({
+  type: z.literal('evidence'),
+  claims: z.array(z.any()),
+  audit_summary: z.any()
+})
 
 export const messagePartSchema = z.union([
   textMessagePartSchema,
   reasoningMessagePartSchema,
-  fileMessagePartSchema
+  fileMessagePartSchema,
+  paperMessagePartSchema,
+  clarificationMessagePartSchema,
+  evidenceMessagePartSchema
 ])
 
 export const chatMessageSchema = z.object({
@@ -48,7 +73,7 @@ export const sendChatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1)
 })
 
-export function extractTextFromParts(parts: Array<z.infer<typeof messagePartSchema>>): string {
+export function extractTextFromParts(parts: Array<any>): string {
   return parts
     .filter((part): part is z.infer<typeof textMessagePartSchema> => part.type === 'text')
     .map(part => part.text.trim())
@@ -56,11 +81,11 @@ export function extractTextFromParts(parts: Array<z.infer<typeof messagePartSche
     .join('\n\n')
 }
 
-export function extractFileParts(parts: Array<z.infer<typeof messagePartSchema>>) {
+export function extractFileParts(parts: Array<any>) {
   return parts.filter((part): part is z.infer<typeof fileMessagePartSchema> => part.type === 'file')
 }
 
-export function buildPromptFromParts(parts: Array<z.infer<typeof messagePartSchema>>): string {
+export function buildPromptFromParts(parts: Array<any>): string {
   const text = extractTextFromParts(parts)
   const files = extractFileParts(parts)
 

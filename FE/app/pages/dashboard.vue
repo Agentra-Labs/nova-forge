@@ -35,6 +35,8 @@ const pipelineStartTime = ref<number | null>(null)
 const modeLabel = computed(() => currentModeInfo.value.label)
 const modeIcon = computed(() => currentModeInfo.value.icon)
 
+const isPipelineActive = computed(() => pipelinePhases.value.some(p => p.status !== 'pending'))
+
 // Dynamic pipeline phases based on mode
 const defaultPhases = computed<PipelinePhase[]>(() => {
   if (isIdeateMode.value) {
@@ -89,7 +91,7 @@ async function createChat(prompt: string) {
   pipelineStartTime.value = Date.now()
   
   // Start first phase
-  if (pipelinePhases.value.length > 0) {
+  if (pipelinePhases.value.length > 0 && pipelinePhases.value[0]) {
     pipelinePhases.value[0].status = 'running'
   }
 
@@ -114,7 +116,7 @@ async function createChat(prompt: string) {
     })
     
     // Mark first phase complete on success
-    if (pipelinePhases.value.length > 0) {
+    if (pipelinePhases.value.length > 0 && pipelinePhases.value[0]) {
       pipelinePhases.value[0].status = 'completed'
       pipelinePhases.value[0].duration = Date.now() - (pipelineStartTime.value || Date.now())
     }
@@ -124,7 +126,7 @@ async function createChat(prompt: string) {
     await navigateTo(`/chat/${chat?.id}`)
   } catch (error) {
     // Mark first phase failed
-    if (pipelinePhases.value.length > 0) {
+    if (pipelinePhases.value.length > 0 && pipelinePhases.value[0]) {
       pipelinePhases.value[0].status = 'failed'
     }
     
@@ -154,7 +156,7 @@ function handleIdeateStarted(jobId: string, arxivId: string) {
   pipelineStartTime.value = Date.now()
   
   // Start pipeline visualization
-  if (pipelinePhases.value.length > 0) {
+  if (pipelinePhases.value.length > 0 && pipelinePhases.value[0]) {
     pipelinePhases.value[0].status = 'running'
   }
 }
@@ -199,70 +201,41 @@ function handleIdeateError(message: string) {
 
 const quickChats = [
   {
-    label: 'Find the strongest paper-backed approach for browser agents',
+    label: 'Compare browser agent approaches',
     icon: 'lucide:scan-search',
     mode: 'deep' as const
   },
   {
-    label: 'Compare retrieval strategies across recent agent papers',
-    icon: 'lucide:network',
-    mode: 'wide' as const
-  },
-  {
-    label: 'Map the leading solutions for hallucination reduction',
+    label: 'Map hallucination reduction methods',
     icon: 'lucide:git-branch-plus',
     mode: 'wide' as const
   },
   {
-    label: '3-pass review of transformer efficiency methods',
+    label: 'Review transformer efficiency',
     icon: 'lucide:book-open',
     mode: 'read' as const
-  },
-  {
-    label: 'Which benchmarks best measure deep research quality?',
-    icon: 'lucide:line-chart',
-    mode: 'deep' as const
-  },
-  {
-    label: 'Wide scan of state-of-the-art research copilots',
-    icon: 'lucide:telescope',
-    mode: 'wide' as const
   }
 ]
 </script>
 
 <template>
-  <div id="home" class="min-h-screen bg-base-100">
+  <div id="home" class="min-h-screen bg-base-100 flex flex-col">
     <DashboardNavbar />
 
-    <div class="flex min-h-[calc(100vh-4rem)] flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden">
       <div ref="dropzoneRef" class="relative flex flex-1 justify-center">
         <DragDropOverlay :show="isDragging" />
 
-        <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-10">
-          <div class="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] lg:items-start">
+        <div class="mx-auto flex w-full flex-1 flex-col px-4 py-8 sm:px-6 lg:px-10 transition-all duration-300"
+             :class="isPipelineActive ? 'max-w-6xl' : 'max-w-3xl items-center justify-center min-h-[calc(100vh-10rem)]'">
+             
+          <div class="w-full transition-all duration-300" 
+               :class="isPipelineActive ? 'grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] lg:items-start' : ''">
             
             <!-- Main Content -->
-            <div class="flex flex-col justify-center gap-6">
-              <!-- Header -->
-              <div class="text-center lg:text-left">
-                <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                  <Icon name="lucide:sparkles" class="h-3.5 w-3.5" />
-                  <span>Agentica Powered</span>
-                </div>
-                <h1 class="font-display text-4xl font-bold tracking-tight text-base-content sm:text-5xl lg:justify-start">
-                  {{ isIdeateMode ? 'Forge Ideate' : 'Forge Research' }}
-                </h1>
-                <p class="mt-4 max-w-xl text-base leading-relaxed text-base-content/70 mx-auto lg:mx-0">
-                  {{ isIdeateMode 
-                    ? 'Drop an arXiv paper. The agent will extract primitives, map market pain, and generate product opportunities.' 
-                    : 'Drop a seed paper or type a research goal. The agent will read, synthesize, and evaluate literature to accelerate your decisions.' 
-                  }}
-                </p>
-              </div>
-
+            <div class="flex flex-col justify-center gap-6 w-full">
               <!-- Ideate Form or Research Form -->
-              <div class="mx-auto w-full max-w-3xl lg:mx-0">
+              <div class="w-full">
                 <!-- Ideate Mode -->
                 <IdeateForm 
                   v-if="isIdeateMode"
@@ -273,8 +246,8 @@ const quickChats = [
                 />
 
                 <!-- Research Mode -->
-                <form v-else @submit.prevent="onSubmit" class="rounded-[2rem] border border-base-300 bg-base-100/60 p-3 shadow-2xl shadow-neutral/5 backdrop-blur-xl transition-all focus-within:border-primary/40 focus-within:bg-base-100/90 focus-within:ring-4 focus-within:ring-primary/10">
-                  <div v-if="files.length > 0" class="mb-2 flex flex-wrap gap-2 rounded-2xl bg-base-200/60 p-2">
+                <form v-else @submit.prevent="onSubmit" class="rounded-3xl bg-base-200/60 p-3 backdrop-blur-xl transition-all focus-within:bg-base-200">
+                  <div v-if="files.length > 0" class="mb-2 flex flex-wrap gap-2 p-2">
                     <FileAvatar
                       v-for="fileWithStatus in files"
                       :key="fileWithStatus.id"
@@ -290,22 +263,23 @@ const quickChats = [
 
                   <textarea
                     v-model="input"
-                    class="textarea textarea-ghost min-h-[5rem] w-full resize-none bg-transparent px-2 text-base leading-7 focus:outline-none placeholder:text-base-content/40 sm:text-[1.05rem]"
+                    class="textarea textarea-ghost min-h-[4rem] w-full resize-none bg-transparent px-3 py-3 text-base leading-relaxed focus:outline-none placeholder:text-base-content/50 sm:text-lg"
                     placeholder="How can I help you research today?"
                     :disabled="isUploading || loading"
+                    @keydown.enter.prevent="onSubmit"
                   />
 
-                  <div class="mt-2 flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <div class="flex items-center gap-1 pl-1 text-base-content/70">
+                  <div class="mt-1 flex flex-wrap items-center justify-between gap-3 px-1">
+                    <div class="flex items-center gap-1 text-base-content/60">
                       <FileUploadButton :open="open" />
-                    </div>
-
-                    <div class="flex items-center gap-1.5 pr-1">
                       <ModelSelect />
                       <ResearchModeMenu />
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
                       <button
                         type="submit"
-                        class="btn btn-primary btn-circle btn-sm ml-1.5 p-0"
+                        class="btn btn-neutral btn-circle btn-sm p-0"
                         :disabled="isUploading || loading || !input.trim()"
                       >
                         <span v-if="loading || isUploading" class="loading loading-spinner loading-xs"></span>
@@ -316,14 +290,14 @@ const quickChats = [
                 </form>
 
                 <!-- Quick Chat Prompts -->
-                <div class="mx-auto mt-6 flex max-w-[42rem] flex-wrap justify-center gap-2.5 lg:justify-start">
+                <div v-if="!isPipelineActive" class="mx-auto mt-6 flex max-w-[42rem] flex-wrap justify-center gap-2">
                   <button
                     v-for="quickChat in quickChats"
                     :key="quickChat.label"
-                    class="group flex items-center gap-2 rounded-full border border-base-300 bg-base-100 px-4 py-2 text-sm text-base-content/75 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-base-content"
+                    class="group flex items-center gap-2 rounded-full bg-base-200/40 px-4 py-2 text-sm text-base-content/60 transition-colors hover:bg-base-200 hover:text-base-content"
                     @click="mode = quickChat.mode; createChat(quickChat.label)"
                   >
-                    <Icon :name="quickChat.icon" class="h-4 w-4 text-base-content/40 group-hover:text-primary transition-colors" />
+                    <Icon :name="quickChat.icon" class="h-4 w-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                     {{ quickChat.label }}
                   </button>
                 </div>
@@ -331,7 +305,7 @@ const quickChats = [
             </div>
 
             <!-- Sidebar: Pipeline Progress -->
-            <div class="hidden lg:block">
+            <div v-if="isPipelineActive" class="hidden lg:block">
               <PipelineProgress 
                 :phases="pipelinePhases"
                 :compact="false"
@@ -340,7 +314,7 @@ const quickChats = [
           </div>
 
           <!-- Mobile Sidebar -->
-          <div class="block lg:hidden">
+          <div v-if="isPipelineActive" class="block lg:hidden w-full mt-8">
             <PipelineProgress 
               :phases="pipelinePhases"
               :compact="true"

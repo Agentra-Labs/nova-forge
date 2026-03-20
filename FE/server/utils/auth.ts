@@ -22,7 +22,7 @@ export async function getViewerIdentity(event: H3Event): Promise<ViewerIdentity>
     await migrateGuestChats(event, auth.userId)
 
     const user = await clerkClient(event).users.getUser(auth.userId)
-    const primaryEmail = user.emailAddresses.find(email => email.id === user.primaryEmailAddressId)?.emailAddress
+    const primaryEmail = user.emailAddresses.find((email: any) => email.id === user.primaryEmailAddressId)?.emailAddress
       ?? user.emailAddresses[0]?.emailAddress
       ?? null
     const username = user.username

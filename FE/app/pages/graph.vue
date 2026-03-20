@@ -11,7 +11,7 @@ const spaces = [
 ];
 
 // Reactive state for active space
-const activeSpace = ref(spaces[0].id);
+const activeSpace = ref(spaces[0]?.id || "default");
 
 // Function to switch active space
 function setActiveSpace(spaceId: string) {

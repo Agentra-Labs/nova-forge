@@ -92,12 +92,12 @@ defineShortcuts({
     />
 
     <aside
-      class="fixed inset-y-0 left-0 z-50 flex flex-col border-r border-base-300/70 bg-base-200/72 backdrop-blur-xl transition-[transform,width] duration-200 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-50 flex flex-col bg-base-200 transition-[transform,width] duration-200 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:translate-x-0"
       :class="[collapsed ? 'w-[16.5rem] lg:w-[5.25rem]' : 'w-[16.5rem]', open ? 'translate-x-0' : '-translate-x-full']"
     >
-      <div class="flex items-center justify-between border-b border-base-300/80 px-5 py-4">
+      <div class="flex items-center justify-between px-5 py-4">
         <NuxtLink to="/dashboard" class="flex items-center gap-3 min-w-0" @click="open = false">
-          <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary shadow-sm">
+          <div class="flex h-10 w-10 items-center justify-center text-primary">
             <Logo class="h-6 w-auto shrink-0" />
           </div>
           <div v-if="!collapsed" class="min-w-0">
@@ -136,12 +136,12 @@ defineShortcuts({
               <li v-for="item in group.items" :key="item.id">
                 <template v-if="item.id">
                 <div
-                  class="group flex items-center gap-2 rounded-2xl border transition-colors"
+                  class="group flex items-center gap-2 rounded-2xl transition-colors"
                   :class="[
                     collapsed ? 'justify-center px-0 py-2' : 'px-2 py-1.5',
                     route.path === `/chat/${item.id}`
-                    ? 'border-primary/20 bg-base-100/95 shadow-sm'
-                    : 'border-transparent hover:border-base-300/70 hover:bg-base-100/65'
+                    ? 'bg-base-300/50'
+                    : 'hover:bg-base-300/30'
                   ]"
                 >
                   <NuxtLink
@@ -152,7 +152,7 @@ defineShortcuts({
                   >
                     <div
                       class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                      :class="route.path === `/chat/${item.id}` ? 'bg-primary/12 text-primary shadow-sm' : 'bg-base-300/70 text-base-content/80 shadow-sm'"
+                      :class="route.path === `/chat/${item.id}` ? 'text-primary' : 'text-base-content/80'"
                     >
                       <Icon name="lucide:message-circle" class="h-4 w-4" />
                     </div>
@@ -175,7 +175,7 @@ defineShortcuts({
           </div>
         </div>
 
-        <div class="mt-4 border-t border-base-300/80 pt-4">
+        <div class="mt-4 pt-4">
           <UserMenu v-if="isLoaded && isSignedIn" :collapsed="collapsed" />
           <SignInButton
             v-else-if="isLoaded"

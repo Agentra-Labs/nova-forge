@@ -25,14 +25,25 @@ function onToggle(event: Event) {
 </script>
 
 <template>
-  <details class="collapse collapse-arrow bg-base-100/50 my-5" :open="open" @toggle="onToggle">
-    <summary class="collapse-title text-sm font-medium w-auto inline-flex items-center gap-2 cursor-pointer p-0 group" :class="{ 'pl-0': true, 'pr-6': text.length > 0 }">
-      {{ isStreaming ? 'Thinking...' : 'Thoughts' }}
-    </summary>
-    <div class="collapse-content px-0">
+  <div class="my-3 flex flex-col gap-2">
+    <button 
+      class="flex items-center gap-2 text-[13px] font-medium text-base-content/40 hover:text-base-content/60 transition-colors w-fit"
+      @click="open = !open"
+    >
+      <Icon 
+        :name="open ? 'lucide:chevron-down' : 'lucide:chevron-right'" 
+        class="h-3.5 w-3.5" 
+      />
+      <span>{{ isStreaming ? 'Thinking...' : 'Thoughts' }}</span>
+    </button>
+    
+    <div 
+      v-if="open" 
+      class="pl-5 border-l border-base-300/60 ml-1.5 flex flex-col gap-1.5"
+    >
       <div v-for="(value, index) in cleanMarkdown(text).split('\n').filter(Boolean)" :key="index">
-        <span class="whitespace-pre-wrap text-sm text-base-content/70 font-normal">{{ value }}</span>
+        <p class="whitespace-pre-wrap text-[13px] text-base-content/60 font-normal leading-relaxed">{{ value }}</p>
       </div>
     </div>
-  </details>
+  </div>
 </template>

@@ -66,10 +66,10 @@ export type MessagePart =
     | { type: 'tool-chart', invocation: any }
     // Issue #2: Clarification request from Context Sentinel
     | { type: 'clarification',
-        confidence: number,
+        confidence_score: number,
         intent: string,
         missing_context: string[],
-        questions: Array<{ id: string, question: string, options?: string[] }>,
+        clarification_questions: Array<{ id: string, question: string, options?: string[] }>,
         best_guess_plan?: string }
     // Issue #3: Evidence audit result
     | { type: 'evidence',
@@ -99,9 +99,9 @@ export interface ChatMessage {
 export interface ContextAnalysis {
     confidence_score: number
     intent: string
-    scope: 'broad' | 'moderate' | 'narrow'
-    constraints: string[]
-    entities: string[]
+    scope?: 'broad' | 'moderate' | 'narrow'
+    constraints?: string[]
+    entities?: string[]
     missing_context: string[]
     clarification_questions: Array<{ id: string, question: string, options?: string[] }>
     best_guess_plan?: string

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DefineComponent } from 'vue'
-import type { ChatMessage } from '#shared/types/research'
+import type { ChatMessage, MessagePart } from '#shared/types/research'
 import { extractTextFromParts } from '#shared/utils/chat'
 import { useClipboard } from '@vueuse/core'
 import { useToast } from '~/composables/useToast'
@@ -45,13 +45,13 @@ if (!data.value) {
 }
 
 const chatTitle = computed(() => data.value?.title || 'Untitled chat')
-const chatMode = computed(() => data.value?.mode || mode.value)
+const chatMode = computed(() => (data.value?.mode || mode.value) as any)
 
 const input = ref('')
 
 const thread = useThreadController({
   chatId: data.value.id,
-  initialMessages: data.value.messages,
+  initialMessages: data.value.messages as ChatMessage[],
   mode: chatMode,
   onError: (message) => {
     toast.add({
@@ -96,7 +96,7 @@ function stopAll() {
 const copied = ref(false)
 
 function copy(message: ChatMessage) {
-  const text = extractTextFromParts(message.parts) || message.content || ''
+  const text = extractTextFromParts(message.parts as any) || message.content || ''
   clipboard.copy(text)
 
   copied.value = true
@@ -118,56 +118,29 @@ function copy(message: ChatMessage) {
       <div ref="dropzoneRef" class="relative flex min-h-0 flex-1 justify-center">
         <DragDropOverlay :show="isDragging" />
 
-        <div class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-1 flex-col px-4 sm:px-6 lg:px-10">
-          <div class="border-b border-base-300/70 py-4">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">Conversation</p>
-                <h1 class="mt-2 text-xl font-semibold tracking-tight">
-                  {{ chatTitle }}
-                </h1>
-                <p class="mt-1 text-xs text-base-content/60 sm:text-sm">
-                  {{ chatMode === 'deep'
-                    ? 'Deep mode follows evidence chains through papers, methods, and tradeoffs.'
-                    : 'Wide mode surveys the landscape quickly across papers, approaches, and competing signals.' }}
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-          <div class="min-h-0 flex-1 overflow-y-auto pt-5 scroll-smooth">
-            <div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
+        <div class="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-1 flex-col px-4 sm:px-6 lg:px-10">
+          <div class="min-h-0 flex-1 overflow-y-auto pt-6 pb-4 scroll-smooth">
+            <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
                 <div
                   v-for="message in chatMessages"
                   :key="message.id"
-                  class="flex"
+                  class="flex w-full"
                   :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
                 >
                   <div
-                    class="flex max-w-[92%] gap-3 sm:max-w-[82%]"
-                    :class="message.role === 'user' ? 'flex-row-reverse' : ''"
+                    class="flex max-w-[92%] gap-4 sm:max-w-[85%]"
+                    :class="message.role === 'user' ? 'flex-row-reverse' : 'flex-row'"
                   >
-                    <div class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-base-300/70 bg-base-200/90">
-                      <Icon
-                        :name="message.role === 'user' ? 'lucide:user-round' : 'lucide:bot'"
-                        class="h-4 w-4"
-                        :class="message.role === 'user' ? 'text-base-content/70' : 'text-primary'"
-                      />
+                    <!-- Assistant Avatar -->
+                    <div v-if="message.role === 'assistant'" class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-200 text-primary">
+                      <Icon name="lucide:bot" class="h-4 w-4" />
                     </div>
 
-                    <div class="min-w-0">
-                      <div class="mb-2 flex items-center gap-2 px-1 text-xs uppercase tracking-[0.2em] text-base-content/45">
-                        <span>{{ message.role === 'user' ? 'You' : 'Assistant' }}</span>
-                        <span v-if="message.role === 'assistant'" class="rounded-full border border-base-300/70 px-2 py-0.5 text-[10px] tracking-[0.16em]">
-                          {{ chatMode === 'deep' ? 'Deep synthesis' : 'Wide scan' }}
-                        </span>
-                      </div>
+                    <div class="min-w-0 flex-1">
                       <div
-                        class="rounded-[1.5rem] border px-3.5 py-2.5 shadow-sm"
                         :class="message.role === 'user'
-                          ? 'border-primary/12 bg-primary text-primary-content'
-                          : 'border-base-300/75 bg-base-100/72 text-base-content'"
+                          ? 'rounded-2xl bg-base-200/80 px-4 py-3 text-base-content'
+                          : 'text-base-content pt-1'"
                       >
                         <template v-for="(part, index) in message.parts" :key="`${message.id}-${part.type}-${index}${'state' in part ? `-${part.state}` : ''}`">
                           <Reasoning
@@ -193,7 +166,6 @@ function copy(message: ChatMessage) {
                             :preview-url="part.url"
                             class="mt-2 inline-flex"
                           />
-                        </template>
                           <ClarificationRequest
                             v-else-if="part.type === 'clarification'"
                             :analysis="part"
@@ -204,10 +176,11 @@ function copy(message: ChatMessage) {
                             :audit="part"
                             class="mt-2"
                           />
+                        </template>
                       </div>
 
-                      <div v-if="message.role === 'assistant' && !isStreaming" class="mt-2 flex gap-2 px-1">
-                        <button class="btn btn-ghost btn-xs gap-1 rounded-full" @click="copy(message)">
+                      <div v-if="message.role === 'assistant' && !isStreaming" class="mt-2 flex gap-2">
+                        <button class="btn btn-ghost btn-xs gap-1 rounded-full text-base-content/50 hover:text-base-content" @click="copy(message)">
                           <Icon :name="copied ? 'lucide:copy-check' : 'lucide:copy'" class="w-3 h-3" />
                           Copy
                         </button>
@@ -218,30 +191,28 @@ function copy(message: ChatMessage) {
 
                 <!-- Research Stream -->
                 <div v-if="thread.researchRunning.value || thread.researchContent.value" class="flex justify-start">
-                  <div class="w-full max-w-[92%] sm:max-w-[82%]">
-                    <div class="mb-2 flex items-center gap-2 px-1 text-xs uppercase tracking-[0.2em] text-base-content/45">
-                      <Icon name="lucide:sparkles" class="h-3 w-3 text-primary" />
-                      <span>Research Agent</span>
-                      <span class="rounded-full border border-primary/30 px-2 py-0.5 text-[10px] tracking-[0.16em] text-primary/70">
-                        {{ chatMode === 'deep' ? 'Deep analysis' : 'Wide scan' }}
-                      </span>
+                  <div class="flex max-w-[92%] gap-4 sm:max-w-[85%] flex-row">
+                    <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Icon name="lucide:sparkles" class="h-4 w-4" />
                     </div>
-                    <ResearchStream
-                      :steps="thread.researchSteps.value"
-                      :current-step="thread.researchCurrentStep.value"
-                      :is-running="thread.researchRunning.value"
-                      :content="thread.researchContent.value"
-                      :error="thread.researchError.value"
-                    />
+                    <div class="min-w-0 flex-1 pt-1">
+                      <ResearchStream
+                        :steps="thread.researchSteps.value"
+                        :current-step="thread.researchCurrentStep.value"
+                        :is-running="thread.researchRunning.value"
+                        :content="thread.researchContent.value"
+                        :error="thread.researchError.value"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div v-if="isStreaming && lastChatMessage?.role === 'user'" class="flex justify-start">
-                  <div class="flex max-w-[88%] gap-3 sm:max-w-[80%]">
-                    <div class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-base-300 bg-base-200">
-                      <Icon name="lucide:bot" class="w-5 h-5 text-primary" />
+                  <div class="flex max-w-[88%] gap-4 sm:max-w-[80%] flex-row">
+                    <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-base-200 text-primary">
+                      <Icon name="lucide:bot" class="h-4 w-4" />
                     </div>
-                    <div class="rounded-[1.5rem] border border-base-300 bg-base-100/72 px-3.5 py-2.5 text-base-content shadow-sm">
+                    <div class="pt-2 text-base-content/60">
                       <span class="loading loading-dots loading-sm"></span>
                     </div>
                   </div>
@@ -249,9 +220,9 @@ function copy(message: ChatMessage) {
             </div>
           </div>
 
-          <div class="sticky bottom-0 mt-auto bg-gradient-to-t from-base-100 via-base-100 to-transparent px-1 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-5 sm:px-2">
-            <form @submit.prevent="handleSubmit" class="mx-auto max-w-5xl rounded-[1.75rem] border border-base-300/75 bg-base-200/82 p-3 shadow-xl shadow-neutral/10 backdrop-blur transition-all focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/10">
-              <div v-if="files.length > 0" class="mb-2 flex flex-wrap gap-2 rounded-box bg-base-100/72 p-2">
+          <div class="sticky bottom-0 mt-auto bg-gradient-to-t from-base-100 via-base-100 to-transparent px-1 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-6 sm:px-2">
+            <form @submit.prevent="handleSubmit" class="mx-auto max-w-3xl rounded-3xl bg-base-200/60 p-2 backdrop-blur-xl transition-all focus-within:bg-base-200">
+              <div v-if="files.length > 0" class="mb-2 flex flex-wrap gap-2 p-2">
                 <FileAvatar
                   v-for="fileWithStatus in files"
                   :key="fileWithStatus.id"
@@ -266,59 +237,54 @@ function copy(message: ChatMessage) {
               </div>
 
               <!-- Error display -->
-              <div v-if="thread.chatError.value" class="text-error text-sm mb-2 px-2">
+              <div v-if="thread.chatError.value" class="text-error text-sm mb-2 px-3">
                 {{ thread.chatError.value }}
               </div>
 
-              <input
+              <textarea
                 v-model="input"
-                type="text"
-                class="input input-ghost w-full bg-transparent px-1 text-base focus:outline-none focus:bg-transparent placeholder:text-base-content/40"
-                @keydown.enter="handleSubmit"
+                class="textarea textarea-ghost min-h-[3rem] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none placeholder:text-base-content/40"
+                @keydown.enter.prevent="handleSubmit"
                 :placeholder="chatMode === 'deep'
                   ? 'Ask for stronger evidence, edge cases, or direct paper comparisons...'
                   : 'Ask for broader coverage, more papers, or alternate solution families...'"
                 :disabled="isBusy"
+                rows="1"
               />
 
-              <div class="mt-3 flex items-center justify-between border-t border-base-300/60 pt-3">
-                <div class="flex items-center gap-2">
+              <div class="mt-1 flex items-center justify-between px-1">
+                <div class="flex items-center gap-1 text-base-content/60">
                   <FileUploadButton :open="open" />
                   <ModelSelect />
+                  <ResearchModeMenu />
                 </div>
 
-                <div class="flex gap-2">
-                  <ResearchModeMenu />
+                <div class="flex gap-1.5">
                   <button 
                     v-if="isBusy"
                     type="button" 
-                    class="btn btn-neutral btn-sm h-9 min-h-9 rounded-full px-3.5"
+                    class="btn btn-neutral btn-circle btn-sm p-0"
                     @click="stopAll()"
                   >
-                    <Icon name="lucide:square" class="w-4 h-4 fill-current" />
-                    <span>Stop</span>
+                    <Icon name="lucide:square" class="w-3.5 h-3.5 fill-current" />
                   </button>
                   <button 
                     v-else-if="thread.hasMessages.value && !input"
                     type="button" 
-                    class="btn btn-ghost btn-sm h-9 min-h-9 rounded-full px-3.5"
+                    class="btn btn-ghost btn-circle btn-sm p-0 text-base-content/60 hover:text-base-content"
                     @click="retryLastTurn()"
                     title="Regenerate"
                   >
                     <Icon name="lucide:rotate-cw" class="w-4 h-4" />
-                    <span>Retry</span>
                   </button>
                   <button 
                     v-else
                     type="submit" 
-                    class="btn btn-primary btn-sm h-9 min-h-9 rounded-full px-4"
+                    class="btn btn-neutral btn-circle btn-sm p-0"
                     :disabled="isBusy || !input.trim()"
                   >
                     <span v-if="isUploading" class="loading loading-spinner loading-xs"></span>
-                    <template v-else>
-                      <span>Send</span>
-                      <Icon name="lucide:arrow-up" class="w-4 h-4" />
-                    </template>
+                    <Icon v-else name="lucide:arrow-up" class="w-4 h-4" />
                   </button>
                 </div>
               </div>
